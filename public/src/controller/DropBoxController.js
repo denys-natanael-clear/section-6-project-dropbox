@@ -5,7 +5,6 @@ class DropBoxController {
         this.currentFolder = ['hcode']
 
         this.onselectionchange = new Event('selectionchange')
-
         
         this.navEl = document.querySelector('#browse-location')
         this.btnSendFileEl = document.querySelector('#btn-send-file') 
@@ -41,8 +40,7 @@ class DropBoxController {
           };
         
           // Initialize Firebase
-          const app = firebase.initializeApp(firebaseConfig);
-          const database = app.database();
+          firebase.initializeApp(firebaseConfig);
     }
 
     getSelection () {
@@ -169,11 +167,13 @@ class DropBoxController {
             this.uploadTasks(event.target.files).then(responses => {
 
                 responses.forEach(resp => {
-
-                    this.getFireBaseRef().push().set(resp.files['input-file'])
-                    
-
-                })   
+                    this.getFireBaseRef().push().set({
+                        name: resp.name,
+                        type: resp.contentType,
+                        path: resp.getDownloadURL[0],
+                        size: resp.size 
+                    })
+                })
 
                 this.uploadComplete()
 
@@ -254,17 +254,39 @@ class DropBoxController {
 
         [...files].forEach(file => {
 
-            let formData = new FormData()
+            promises.push(new Promise((resolve, reject) => {
 
-            formData.append('input-file', file)
+                let fileRef = firebase.storage().ref(this.currentFolder.join('/')).child(file.name)
 
-            promises.push(this.ajax('/upload', 'POST' , formData, () => {
+                let task = fileRef.put(file)
 
-                this.uploadProgress(event, file)
+                task.on('state_changed', snapshot => {
 
-            }, () => {
+                    this.uploadProgress({
+                        loaded: snapshot.bytesTransferred,
+                        total: snapshot.totalBytes
+                    }, file)
+                    console.log('progress', snapshot)
 
-                this.startUploadTime = Date.now()
+                }, error => {
+
+                    console.error(error)
+                    reject(error)
+
+                }, () => {
+
+                    fileRef.getMetadata().then(metadata => {
+
+                        console.log(metadata)
+                        resolve(metadata)
+
+                    }).catch(err => {
+
+                        reject(err)
+
+                    })
+
+            })
 
             }))
 
