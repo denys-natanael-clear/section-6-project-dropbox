@@ -709,7 +709,7 @@ class DropBoxController {
                     break
 
                 default:
-                    window.open('/file?path=' + file.filepath)
+                    window.open(file.path)
 
 
             }
