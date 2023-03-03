@@ -41,6 +41,7 @@ class DropBoxController {
         
           // Initialize Firebase
           firebase.initializeApp(firebaseConfig);
+          const storage = firebase.storage()
     }
 
     getSelection () {
@@ -58,12 +59,27 @@ class DropBoxController {
             let file = JSON.parse(li.dataset.file)
             let key = li.dataset.key
 
-            let formData = new FormData()
+            promises.push(new Promise((resolve, reject) => {
 
-            formData.append('path', file.filepath)
-            formData.append('key', key)
+                let fileRef = firebase.storage().ref(this.currentFolder.join('/')).child(file.name)
 
-            promises.push(this.ajax('/file', 'DELETE', formData))
+                fileRef.delete().then(() => {
+
+                    resolve({
+
+                        fields: {
+                            key
+                        }
+
+                    })
+
+                }).catch(err => {
+
+                    reject(err)
+
+                })
+
+            })) 
 
         })
 
@@ -148,8 +164,6 @@ class DropBoxController {
                 default:
                     this.btnDelete.style.display = 'block'
                     this.btnRename.style.display = 'none'
-
-
             }
 
         })
@@ -165,13 +179,12 @@ class DropBoxController {
             this.btnSendFileEl.disabled = true
 
             this.uploadTasks(event.target.files).then(responses => {
-
-                responses.forEach(resp => {
+                responses.forEach(resp=>{
                     this.getFireBaseRef().push().set({
                         name: resp.name,
                         type: resp.contentType,
-                        path: resp.getDownloadURL[0],
-                        size: resp.size 
+                        path: resp.customMetadata.downloadURL,
+                        size: resp.size
                     })
                 })
 
@@ -248,53 +261,38 @@ class DropBoxController {
 
     }
 
-    uploadTasks (files) {
+    uploadTasks(files){
+        let promises= [];
+        [...files].forEach(file=>{
 
-        let promises = [];
-
-        [...files].forEach(file => {
-
-            promises.push(new Promise((resolve, reject) => {
-
-                let fileRef = firebase.storage().ref(this.currentFolder.join('/')).child(file.name)
-
+            promises.push(new Promise((resolve, reject)=>{
+                let fileRef = firebase.storage().ref(this.currentFolder.join("/")).child(file.name)
                 let task = fileRef.put(file)
 
-                task.on('state_changed', snapshot => {
-
+                this.startUploadTime = Date.now()
+                task.on("state_changed", snapshot=>{
                     this.uploadProgress({
-                        loaded: snapshot.bytesTransferred,
+                        loaded: snapshot.bytesTransferred, 
                         total: snapshot.totalBytes
-                    }, file)
-                    console.log('progress', snapshot)
-
-                }, error => {
-
-                    console.error(error)
-                    reject(error)
-
-                }, () => {
-
-                    fileRef.getMetadata().then(metadata => {
-
-                        console.log(metadata)
-                        resolve(metadata)
-
-                    }).catch(err => {
-
-                        reject(err)
-
+                    },file)
+                }, err=>{
+                    reject(err)
+                }, ()=>{
+                    fileRef.getDownloadURL().then( downloadURL => {
+                        fileRef.updateMetadata({ customMetadata: { downloadURL }}).then( metadata => {
+                            resolve( metadata )
+                       }).catch( error => {
+                            console.error( 'Error update metadata:', error)
+                            reject( error ) 
+                       })
                     })
-
-            })
-
-            }))
-
+                })
+            }))          
         })
 
         return Promise.all(promises)
-
     }
+    
 
     uploadProgress(event, file) {
 
@@ -550,8 +548,6 @@ class DropBoxController {
                     this.listFilesEl.appendChild(this.getFileView(data, key))
 
                 }
-
-
             })
 
         })
