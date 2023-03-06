@@ -57,14 +57,10 @@ class DropBoxController {
             let folderRef = this.getFireBaseRef(ref + '/' + name)
 
             folderRef.on('value', snapshot => {
-
                 folderRef.off('value')
-
                 snapshot.forEach(item => {
-
                     let data = item.val()
                     data.key = item.key
-
                     if (data.type === 'folder') {
 
                         this.removeFolderTask(ref + '/' + name, data.name).then(() => {
@@ -72,9 +68,9 @@ class DropBoxController {
                             resolve({
                                 fields: {
                                     key: data.key
+                                    
                                 }
-                            })
-
+                            });
                         }).catch(err => {
                             reject(err)
                         })
@@ -116,7 +112,7 @@ class DropBoxController {
 
             promises.push(new Promise((resolve, reject) => {
 
-                if (file.mimetype === 'folder') {
+                if (file.mimetype === 'folder' || file.type === 'folder') {
 
                     this.removeFolderTask(this.currentFolder.join('/'), file.name).then(() => {
 
@@ -130,7 +126,7 @@ class DropBoxController {
     
                     })
 
-                } else if (file.mimetype) {
+                } else if (file.mimetype || file.type) {
 
                     this.removeFile(this.currentFolder.join('/'), file.name).then(() => {
 
@@ -175,7 +171,7 @@ class DropBoxController {
                 this.getFireBaseRef().push().set({
 
                     originalFilename: name,       
-                    mimetype: 'folder',
+                    type: 'folder',
                     path: this.currentFolder.join('/')
 
                 })
@@ -216,7 +212,7 @@ class DropBoxController {
 
             if (name) {
 
-                file.originalFilename = name
+                file.name = name
 
                 this.getFireBaseRef().child(li.dataset.key).set(file)
 
@@ -409,7 +405,7 @@ class DropBoxController {
 
     getFileIconView (file) {
 
-        switch (file.mimetype) {
+        switch (file.mimetype || file.type) {
 
             case 'folder':
                 return `
@@ -595,10 +591,17 @@ class DropBoxController {
 
         li.dataset.key = key
         li.dataset.file = JSON.stringify(file)
+        let name
+        if(file.name){
+            name = file.name;
+        }
+        else if(file.originalFilename){
+            name = file.originalFilename;
+        }
 
         li.innerHTML = `
             ${this.getFileIconView(file)}
-            <div class="name text-center">${file.originalFilename}</div>
+            <div class="name text-center">${name}</div>
         `
 
         this.initEventsLI(li)
@@ -620,7 +623,7 @@ class DropBoxController {
                 let key = snapshotItem.key
                 let data = snapshotItem.val()
 
-                if (data.mimetype) {
+                if (data.mimetype || data.type) {
 
                     this.listFilesEl.appendChild(this.getFileView(data, key))
 
@@ -701,7 +704,7 @@ class DropBoxController {
 
             let file = JSON.parse(li.dataset.file)
 
-            switch (file.mimetype) {
+            switch (file.mimetype || file.type) {
 
                 case 'folder': 
                     this.currentFolder.push(file.originalFilename)
